@@ -4,6 +4,10 @@ from phonenumber_field.modelfields import PhoneNumberField
 import shortuuid
 
 
+def institute_upload(instance, filename):
+    return f"uploads/{instance.uid}/{filename}"
+
+
 class BaseModel(models.Model):
 
     class Meta:
@@ -22,6 +26,26 @@ class BaseModel(models.Model):
 
         super().save(*args, **kwargs)
 
+    @property
+    def id(self) -> str:
+        return self.uid
+
+
+class Institute(BaseModel):
+    name = models.CharField(max_length=256)
+    address = models.TextField()
+    contact_number = models.CharField(max_length=20)
+    website = models.URLField(blank=True)  # Optional website field
+    image = models.ImageField(
+        upload_to=institute_upload, blank=True, null=True
+    )
+    description = models.TextField(blank=True)  # Longer description
+    # Dictionary for social media links
+    social_media_links = models.JSONField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
 
 class User(AbstractUser, BaseModel):
 
@@ -34,12 +58,11 @@ class User(AbstractUser, BaseModel):
     phone_number = PhoneNumberField(region="IN", default=None, null=True)
     meta = models.JSONField("MetaData", default=dict)
 
+    institute = models.ForeignKey(
+        Institute, on_delete=models.PROTECT, related_name="users", null=True)
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ['name']
 
     def __str__(self) -> str:
         return self.name
-
-    @property
-    def id(self):
-        return self.uid
