@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from .serializers import EmployeeSerializer
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import logout
-from .permissions import IsAdminUser
+from core.permissions import IsAdminUser
 
 # Create your views here.
 

@@ -1,5 +1,5 @@
 from rest_framework.generics import CreateAPIView, ListAPIView
-from rest_framework.permissions import IsAdminUser
+from core.permissions import IsAdminUser
 from .models import Batch, Chapter, Subject, Enrollment
 from .serializers import BatchSerializer, ChapterSerializer, SubjectSerializer
 

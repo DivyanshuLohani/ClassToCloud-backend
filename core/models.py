@@ -1,5 +1,6 @@
+from typing import Any
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from phonenumber_field.modelfields import PhoneNumberField
 import shortuuid
 
@@ -14,7 +15,7 @@ class BaseModel(models.Model):
         abstract = True
 
     id = None
-    uid = models.CharField(max_length=64, primary_key=True)
+    uid = models.CharField(max_length=64, primary_key=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -47,6 +48,22 @@ class Institute(BaseModel):
         return self.name
 
 
+class UserManager(BaseUserManager):
+
+    def create_superuser(self, email, password, **extra_fields):
+        user = self.model(email=email, **extra_fields)
+        user.is_superuser = True
+        user.is_staff = True
+        user.set_password(password)
+        user.save(using=self.db)
+        return user
+
+    def create(self, **kwargs: Any) -> Any:
+        password = kwargs.pop("password")
+        self.set_password(password)
+        return super().create(**kwargs)
+
+
 class User(AbstractUser, BaseModel):
 
     first_name = None
@@ -54,15 +71,26 @@ class User(AbstractUser, BaseModel):
     username = None
     name = models.CharField(max_length=256)
     email = models.EmailField(unique=True)
-    standard = models.CharField(max_length=10, default=None, null=True)
+    standard = models.CharField(
+        max_length=10, default=None, null=True, blank=True)
     phone_number = PhoneNumberField(region="IN", default=None, null=True)
-    meta = models.JSONField("MetaData", default=dict)
+    meta = models.JSONField("MetaData", default=dict, blank=True, null=True)
+
+    is_teacher = models.BooleanField(default=False)
 
     institute = models.ForeignKey(
         Institute, on_delete=models.PROTECT, related_name="users", null=True)
 
+    objects = UserManager()
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ['name']
+
+    def save(self, *args, **kwargs):
+        if self.password and not self.password.startswith(('pbkdf2_sha256$', 'bcrypt$', 'argon2')):
+            self.set_password(self.password)
+
+        return super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return self.name
