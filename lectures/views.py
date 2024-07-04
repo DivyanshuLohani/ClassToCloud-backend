@@ -12,7 +12,7 @@ class LectureViewSet(viewsets.ModelViewSet):
     serializer_class = LectureSerializer
 
     def perform_create(self, serializer):
-        lecture = serializer.save()
+        lecture = serializer.save(type=self.request.user.institute.upload_type)
         if not self.request.user.is_teacher:
             raise PermissionDenied()
         if not self.request.user.institute == lecture.chapter.subject.batch.institute:

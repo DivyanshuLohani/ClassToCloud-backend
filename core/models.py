@@ -40,6 +40,11 @@ class Institute(BaseModel):
     # Dictionary for social media links
     social_media_links = models.JSONField(blank=True, null=True)
 
+    upload_type = models.CharField(
+        choices=(('native', "Native"), ('youtube', "Youtube")), default='youtube',
+        max_length=10,
+    )
+
     def __str__(self):
         return self.name
 
