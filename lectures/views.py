@@ -3,7 +3,7 @@ from rest_framework import viewsets
 from .models import Lecture
 from .serializers import LectureSerializer
 from .tasks import transcode_video, upload_to_youtube
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, PermissionDenied
 
 
 class LectureViewSet(viewsets.ModelViewSet):
@@ -13,6 +13,8 @@ class LectureViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         lecture = serializer.save()
+        if not self.request.user.is_teacher:
+            raise PermissionDenied()
         if not self.request.user.institute == lecture.chapter.subject.batch.institute:
             lecture.delete()
             raise NotFound("Chapter not found.")
