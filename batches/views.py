@@ -10,10 +10,11 @@ class GetBatches(ListAPIView):
     def get_queryset(self):
         user = self.request.user
 
-        if user.is_staff:
+        if user.is_teacher:
             return Batch.objects.all()
 
-        enrolled = user.enrollment_set.all().values_list('batch__id', flat=True)
+        enrolled = Enrollment.objects.filter(user=user)
+
         return Batch.objects.filter(pk__in=enrolled)
 
 

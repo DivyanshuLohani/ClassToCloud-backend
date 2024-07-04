@@ -27,10 +27,6 @@ class BaseModel(models.Model):
 
         super().save(*args, **kwargs)
 
-    @property
-    def id(self) -> str:
-        return self.uid
-
 
 class Institute(BaseModel):
     name = models.CharField(max_length=256)

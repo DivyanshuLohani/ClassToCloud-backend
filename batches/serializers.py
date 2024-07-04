@@ -14,7 +14,7 @@ class AddInstituteMixin:
 class SubjectSerializer(ModelSerializer):
     class Meta:
         model = Subject
-        fields = ['id', 'uid', 'name', 'batch']  # Add other fields if needed
+        fields = ['uid', 'name', 'batch']  # Add other fields if needed
 
     def create(self, validated_data):
         batch_id = validated_data.pop('batch')
@@ -31,7 +31,7 @@ class BatchSerializer(ModelSerializer, AddInstituteMixin):
 
     class Meta:
         model = Batch
-        fields = ['id', 'uid', 'name', 'description',
+        fields = ['uid', 'name', 'description',
                   'is_active', 'start_date', 'end_date', 'subjects']
 
 

@@ -16,8 +16,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+import lectures.utils
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('google-auth/', lectures.utils.google_authenticate,
+         name='google_authenticate'),
+    path('google-auth/callback/', lectures.utils.google_oauth2_callback,
+         name='google_auth_callback'),
     path("auth/", include("authentication.urls")),
+    path("batches/", include("batches.urls")),
+    path("lectures/", include("lectures.urls")),
 ]

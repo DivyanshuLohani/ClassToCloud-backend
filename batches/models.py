@@ -56,6 +56,9 @@ class Batch(BaseModel):
     end_date = models.DateTimeField(
         default=one_year_from_now)
 
+    def __str__(self) -> str:
+        return f"{self.name} ({self.description})"
+
 
 class Subject(BaseModel):
 
@@ -63,6 +66,9 @@ class Subject(BaseModel):
     name = models.CharField(max_length=32)
 
     objects = SubjectPermissionManager()
+
+    def __str__(self) -> str:
+        return f"{self.name} - {self.batch}"
 
 
 class Chapter(BaseModel):
@@ -72,6 +78,9 @@ class Chapter(BaseModel):
         Subject, on_delete=models.CASCADE, related_name="chapters")
 
     objects = ChapterPermissionManager()
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class Enrollment(models.Model):
