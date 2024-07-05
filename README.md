@@ -73,7 +73,7 @@ This is the backend for the Ed-Tech App, which supports multiple coaching instit
 - `POST /auth/login/` - Login
 - `POST /auth/register/` - Register
 - `POST /auth/refresh/` - Refresh Token
-- `GET /auth/user/` - Get Logged in user details
+- `GET /auth/user/` - Get logged-in user details
 
 ### Batch Management
 
@@ -87,6 +87,20 @@ This is the backend for the Ed-Tech App, which supports multiple coaching instit
 ### Lecture Management
 
 - `POST /lectures/` - Create a new lecture
+- `GET /lectures/:uid/` - Get a lecture with ID
+- `GET /batches/chapters/:uid/lectures/` - Get all the lectures in the chapter
+
+### Notes Management
+
+- `GET /batches/chapters/:uid/notes` - Get all the notes in the chapter
+- `POST /documents/notes/` - Create notes
+- `GET /documents/notes/:uid` - Get note with ID
+
+### DPP Management
+
+- `GET /batches/chapters/:uid/dpps` - Get all the DPPs in the chapter
+- `POST /documents/dpps/` - Create DPP
+- `GET /documents/dpps/:uid` - Get DPP with ID
 
 ## Testing
 
