@@ -1,15 +1,16 @@
-from rest_framework import viewsets
-# from chunked_upload.views import ChunkedUploadView, ChunkedUploadCompleteView
 from .models import Lecture
+from core.permissions import OnlyTeacherUpdate, IsTeacher
+from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework import generics
 from .serializers import LectureSerializer
 from .tasks import transcode_video, upload_to_youtube
-from rest_framework.exceptions import NotFound, PermissionDenied
 
 
-class LectureViewSet(viewsets.ModelViewSet):
+class LectureCreateView(generics.CreateAPIView):
 
     queryset = Lecture.objects.all()
     serializer_class = LectureSerializer
+    permission_classes = [IsTeacher]
 
     def perform_create(self, serializer):
         lecture = serializer.save(type=self.request.user.institute.upload_type)
@@ -18,9 +19,6 @@ class LectureViewSet(viewsets.ModelViewSet):
         if not self.request.user.institute == lecture.chapter.subject.batch.institute:
             lecture.delete()
             raise NotFound("Chapter not found.")
-
-        # TODO: make it so that server decides wheather video is native or youtube
-        # if self.user.institute.type =
         if lecture.type == 'native' and lecture.file:
             lecture.status = 'pending'
             lecture.save()
@@ -30,21 +28,23 @@ class LectureViewSet(viewsets.ModelViewSet):
             lecture.save()
             upload_to_youtube.delay(lecture.uid)
 
-# class VideoChunkedUploadView(ChunkedUploadView):
-#     model = VideoChunkedUpload
-#     field_name = 'file'
 
+class LectureView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = LectureSerializer
+    permission_classes = [OnlyTeacherUpdate]
 
-# class VideoChunkedUploadCompleteView(ChunkedUploadCompleteView):
-#     model = VideoChunkedUpload
+    def get_queryset(self):
+        c_uid = self.kwargs['c_uid']
+        return Lecture.objects.filter(chapter__uid=c_uid)
 
-#     def on_completion(self, uploaded_file, request):
-#         lecture_id = request.data.get('lecture_id')
-#         lecture = Lecture.objects.get(id=lecture_id)
-#         lecture.file = uploaded_file
-#         lecture.status = 'pending'
-#         lecture.save()
-#         transcode_video.delay(lecture.id)
+    def get_object(self):
 
-#     def get_response_data(self, chunked_upload, request):
-#         return {'message': 'Upload complete'}
+        if not self.request.user.is_teacher:
+            raise PermissionDenied()
+
+        lecture = super().get_object()
+
+        if (lecture is None) or lecture.chapter.subject.batch.institute != self.request.user.institute:
+            raise NotFound()
+
+        return lecture

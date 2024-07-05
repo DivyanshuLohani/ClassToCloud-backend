@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
+import os
 from datetime import timedelta
 from pathlib import Path
 from django.utils.translation import gettext
@@ -29,8 +30,8 @@ SECRET_KEY = 'django-insecure-n8y%qz1x9wtzqev4p9l-))_74*(%jt6)x4ltd(^wfp1scn9-y0
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['*']
+CORS_ORIGIN_ALLOW_ALL = True
 
 # Application definition
 
@@ -43,6 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'corsheaders',
     'core',
     'authentication',
     'batches',
@@ -57,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'server.urls'
@@ -195,3 +198,6 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 
 GOOGLE_OAUTH2_CLIENT_SECRETS_FILE = 'client_secret.json'
 GOOGLE_OAUTH2_SCOPES = ['https://www.googleapis.com/auth/youtube.upload']
+
+MEDIA_URL = '/uploads/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'uploads')

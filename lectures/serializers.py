@@ -6,3 +6,6 @@ class LectureSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lecture
         fields = '__all__'
+        extra_kwargs = {
+            'type': {'read_only': True}
+        }

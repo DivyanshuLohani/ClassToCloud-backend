@@ -1,7 +1,6 @@
 from celery import shared_task
 import subprocess
 import os
-import google_auth_oauthlib.flow
 import googleapiclient.discovery
 import googleapiclient.errors
 from google.oauth2.credentials import Credentials
@@ -64,7 +63,6 @@ def transcode_video(lecture_id):
 
         try:
             subprocess.run(command, check=True)
-            lecture.progress = int(i / len(res) * 100)
             lecture.save()
         except subprocess.CalledProcessError:
             lecture.status = 'failed'

@@ -4,14 +4,14 @@ from core.serializers import UserSerializer
 from .serializers import UserRegisterSerializer
 from django.contrib.auth import get_user_model
 from rest_framework.generics import RetrieveAPIView, CreateAPIView
-from core.permissions import IsAdminUser
+from core.permissions import IsTeacher
 
 # Create your views here.
 User = get_user_model()
 
 
 class UserRegisterView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsTeacher]
     serializer_class = UserRegisterSerializer
 
     def post(self, request):

@@ -6,7 +6,7 @@ import shortuuid
 
 
 def institute_upload(instance, filename):
-    return f"uploads/{instance.uid}/{filename}"
+    return f"{instance.uid}/{filename}"
 
 
 class BaseModel(models.Model):

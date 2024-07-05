@@ -1,11 +1,10 @@
-# from chunked_upload.models import ChunkedUpload
-from django.db import models
+from batches.models import Chapter, Batch, Enrollment
 from core.models import BaseModel
-from batches.models import Chapter
+from django.db import models
 
 
 def video_upload(instance, filename):
-    return f"uploads/lectures/{instance.uid}.{filename.split(".")[-1]}"
+    return f"lectures/{instance.uid}.{filename.split(".")[-1]}"
 
 
 class Lecture(BaseModel):
@@ -25,13 +24,8 @@ class Lecture(BaseModel):
                             )  # if the type is native
     status = models.CharField(max_length=50, choices=[('pending', 'Pending'), (
         'in_progress', 'In Progress'), ('completed', 'Completed'), ('failed', 'Failed')], default='pending')
-    progress = models.IntegerField(default=0)
 
 
 class GoogleCredentials(models.Model):
 
     credentials = models.TextField()
-
-# class VideoChunkedUpload(ChunkedUpload):
-#     lecture = models.ForeignKey(
-#         Lecture, on_delete=models.CASCADE, related_name="chunked_uploads")

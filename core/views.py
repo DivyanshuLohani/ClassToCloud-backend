@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from .serializers import EmployeeSerializer
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import logout
-from core.permissions import IsAdminUser
+from core.permissions import IsTeacher
 
 # Create your views here.
 
@@ -40,7 +40,7 @@ class CustomLogout(APIView):
 
 class CreateEmployee(APIView):
 
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsTeacher]
 
     def post(self, request):
         serializer = EmployeeSerializer(data=request.data)

@@ -1,5 +1,5 @@
 from rest_framework.generics import CreateAPIView, ListAPIView
-from core.permissions import IsAdminUser
+from core.permissions import IsTeacher
 from .models import Batch, Chapter, Subject, Enrollment
 from .serializers import BatchSerializer, ChapterSerializer, SubjectSerializer
 
@@ -36,15 +36,15 @@ class GetChapters(ListAPIView):
 
 
 class CreateBatch(CreateAPIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsTeacher]
     serializer_class = BatchSerializer
 
 
 class CreateSubject(CreateAPIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsTeacher]
     serializer_class = SubjectSerializer
 
 
 class CreateChapter(CreateAPIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsTeacher]
     serializer_class = ChapterSerializer
