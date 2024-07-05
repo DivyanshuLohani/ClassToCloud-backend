@@ -79,6 +79,10 @@ class Chapter(BaseModel):
 
     objects = ChapterPermissionManager()
 
+    def check_permissions(self, user):
+        if self.subject.batch.institute != user.institute:
+            raise NotFound()
+
     def __str__(self) -> str:
         return self.name
 

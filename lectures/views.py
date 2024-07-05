@@ -4,6 +4,16 @@ from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework import generics
 from .serializers import LectureSerializer
 from .tasks import transcode_video, upload_to_youtube
+import subprocess
+
+
+def get_video_length(filename):
+    result = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                             "format=duration", "-of",
+                             "default=noprint_wrappers=1:nokey=1", filename],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT)
+    return float(result.stdout)
 
 
 class LectureCreateView(generics.CreateAPIView):
@@ -14,11 +24,12 @@ class LectureCreateView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         lecture = serializer.save(type=self.request.user.institute.upload_type)
-        if not self.request.user.is_teacher:
-            raise PermissionDenied()
+        lecture.duration = int(get_video_length(lecture.file.path))
+
         if not self.request.user.institute == lecture.chapter.subject.batch.institute:
             lecture.delete()
             raise NotFound("Chapter not found.")
+
         if lecture.type == 'native' and lecture.file:
             lecture.status = 'pending'
             lecture.save()

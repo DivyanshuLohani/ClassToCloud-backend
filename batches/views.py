@@ -2,6 +2,8 @@ from rest_framework.generics import CreateAPIView, ListAPIView
 from core.permissions import IsTeacher
 from .models import Batch, Chapter, Subject, Enrollment
 from .serializers import BatchSerializer, ChapterSerializer, SubjectSerializer
+from documents.serializers import NoteSerializer, DPPSerializer
+from lectures.serializers import LectureSerializer
 
 
 class GetBatches(ListAPIView):
@@ -48,3 +50,30 @@ class CreateSubject(CreateAPIView):
 class CreateChapter(CreateAPIView):
     permission_classes = [IsTeacher]
     serializer_class = ChapterSerializer
+
+
+class ListChapterNotes(ListAPIView):
+    serializer_class = NoteSerializer
+
+    def get_queryset(self):
+        chapter = Chapter.objects.filter(uid=self.kwargs['uid']).first()
+        chapter.check_permissions(self.request.user)
+        return chapter.notes.all()
+
+
+class ListChapterDPPs(ListAPIView):
+    serializer_class = DPPSerializer
+
+    def get_queryset(self):
+        chapter = Chapter.objects.filter(uid=self.kwargs['uid']).first()
+        chapter.check_permissions(self.request.user)
+        return chapter.dpps.all()
+
+
+class ListChapterLectures(ListAPIView):
+    serializer_class = LectureSerializer
+
+    def get_queryset(self):
+        chapter = Chapter.objects.filter(uid=self.kwargs['uid']).first()
+        chapter.check_permissions(self.request.user)
+        return chapter.lectures.all()

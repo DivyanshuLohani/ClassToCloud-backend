@@ -25,6 +25,9 @@ class Lecture(BaseModel):
     status = models.CharField(max_length=50, choices=[('pending', 'Pending'), (
         'in_progress', 'In Progress'), ('completed', 'Completed'), ('failed', 'Failed')], default='pending')
 
+    class Meta:
+        ordering = ("-created_at",)
+
 
 class GoogleCredentials(models.Model):
 
