@@ -1,7 +1,7 @@
 from django.db import models
 from core.models import BaseModel
 from lectures.models import Lecture
-from batches.models import Chapter
+from batches.models import Chapter, Batch
 
 
 def note_upload_to(instance, filename):
@@ -13,6 +13,10 @@ def dpp_upload_to(instance, filename):
 
 
 class Note(BaseModel):
+
+    batch = models.ForeignKey(
+        Batch, on_delete=models.CASCADE, related_name="notes")
+
     lecture = models.ForeignKey(
         Lecture, on_delete=models.SET_NULL,
         null=True, default=None,
@@ -23,11 +27,17 @@ class Note(BaseModel):
         null=True,
         related_name="notes"
     )
+
     name = models.CharField(max_length=50, default="")
     file = models.FileField(upload_to=note_upload_to)
 
 
 class DPP(BaseModel):
+
+    batch = models.ForeignKey(
+        Batch, on_delete=models.CASCADE, related_name="dpps"
+    )
+
     lecture = models.ForeignKey(
         Lecture, on_delete=models.SET_NULL,
         null=True, default=None,

@@ -23,12 +23,15 @@ import lectures.utils
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('google-auth/', lectures.utils.google_authenticate,
-         name='google_authenticate'),
+         name='google_authenticate'
+         ),
     path('google-auth/callback/', lectures.utils.google_oauth2_callback,
-         name='google_auth_callback'),
+         name='google_auth_callback'
+         ),
     path("auth/", include("authentication.urls")),
     path("batches/", include("batches.urls")),
     path("lectures/", include("lectures.urls")),
+    path("documents/", include("documents.urls")),
 ]
 
 if settings.DEBUG:
