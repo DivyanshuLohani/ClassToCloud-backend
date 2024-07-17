@@ -16,7 +16,6 @@ class GetBatches(ListAPIView):
             return Batch.objects.all()
 
         enrolled = Enrollment.objects.filter(user=user)
-
         return Batch.objects.filter(pk__in=enrolled)
 
 

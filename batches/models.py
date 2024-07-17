@@ -8,10 +8,10 @@ from core.models import Institute
 
 class SubjectPermissionManager(models.Manager):
     def filter_for_user(self, user, batch_id):
-        batch = Batch.objects.filter(uid=batch_id)
-        if not batch.exists() or not batch.institute == user.institute:
+        batch = Batch.objects.filter(uid=batch_id).first()
+        if not batch or not batch.institute == user.institute:
             raise NotFound("Batch not found")
-        if user.is_staff:
+        if user.is_staff or user.is_teacher:
             return self.filter(batch__uid=batch_id)
         else:
             enrollment = Enrollment.objects.filter(
@@ -24,10 +24,10 @@ class SubjectPermissionManager(models.Manager):
 
 class ChapterPermissionManager(models.Manager):
     def filter_for_user(self, user, batch_id):
-        batch = Batch.objects.filter(uid=batch_id)
-        if not batch.exists() or not batch.institute == user.institute:
+        batch = Batch.objects.filter(uid=batch_id).first()
+        if not batch or not batch.institute == user.institute:
             raise NotFound("Batch not found")
-        if user.is_staff:
+        if user.is_staff or user.is_teacher:
             return self.filter(subject__batch=batch)
         else:
             enrollment = Enrollment.objects.filter(
@@ -59,6 +59,9 @@ class Batch(BaseModel):
     def __str__(self) -> str:
         return f"{self.name} ({self.description})"
 
+    class Meta:
+        ordering = ["-created_at"]
+
 
 class Subject(BaseModel):
 
@@ -69,6 +72,9 @@ class Subject(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.name} - {self.batch}"
+
+    class Meta:
+        ordering = ["-created_at"]
 
 
 class Chapter(BaseModel):
@@ -85,6 +91,9 @@ class Chapter(BaseModel):
 
     def __str__(self) -> str:
         return self.name
+
+    class Meta:
+        ordering = ["-created_at"]
 
 
 class Enrollment(models.Model):

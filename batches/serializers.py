@@ -1,4 +1,4 @@
-from rest_framework.serializers import ModelSerializer
+from rest_framework.serializers import ModelSerializer, SerializerMethodField
 from rest_framework.exceptions import NotFound
 from .models import Batch, Subject, Chapter
 
@@ -37,9 +37,22 @@ class BatchSerializer(ModelSerializer, AddInstituteMixin):
 
 class ChapterSerializer(ModelSerializer):
 
+    lectures = SerializerMethodField()
+    notes = SerializerMethodField()
+    dpps = SerializerMethodField()
+
     class Meta:
         model = Chapter
-        fileds = "__all__"
+        fields = ['uid', 'name', 'subject', 'lectures', 'notes', 'dpps']
+
+    def get_lectures(self, instance):
+        return len(instance.lectures.all())
+
+    def get_notes(self, instance):
+        return len(instance.notes.all())
+
+    def get_dpps(self, instance):
+        return len(instance.dpps.all())
 
     def create(self, validated_data):
         sub_id = validated_data.pop('subject')
