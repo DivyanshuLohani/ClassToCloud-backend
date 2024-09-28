@@ -33,7 +33,7 @@ def transcode_video(lecture_id):
     lecture.status = 'in_progress'
     lecture.save()
 
-    input_path = lecture.file.path
+    input_path = os.path.join("uploads", lecture.file.path)
     output_dir = f'uploads/lectures/{lecture_id}'
     os.makedirs(output_dir, exist_ok=True)
     variant_playlists = []
@@ -88,7 +88,8 @@ def transcode_video(lecture_id):
     with open(master_playlist_file_path, 'w') as f:
         f.write(master_playlist_content)
 
-    lecture.file = master_playlist_file_path
+    lecture.file = master_playlist_file_path.replace("uploads/", "")
+    lecture.status = "completed"
     lecture.save()
     os.remove(input_path)
 
