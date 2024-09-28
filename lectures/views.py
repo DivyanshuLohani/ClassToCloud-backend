@@ -43,17 +43,11 @@ class LectureCreateView(generics.CreateAPIView):
 class LectureView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = LectureSerializer
     permission_classes = [OnlyTeacherUpdate]
-
-    def get_queryset(self):
-        c_uid = self.kwargs['c_uid']
-        return Lecture.objects.filter(chapter__uid=c_uid)
+    queryset = Lecture.objects.all()
 
     def get_object(self):
-
-        if not self.request.user.is_teacher:
-            raise PermissionDenied()
-
-        lecture = super().get_object()
+        c_uid = self.kwargs['c_uid']
+        lecture = generics.get_object_or_404(self.get_queryset(), uid=c_uid)
 
         if (lecture is None) or lecture.chapter.subject.batch.institute != self.request.user.institute:
             raise NotFound()
