@@ -1,4 +1,4 @@
-from rest_framework.generics import CreateAPIView, ListAPIView
+from rest_framework.generics import CreateAPIView, ListAPIView, get_object_or_404
 from core.permissions import IsTeacher
 from .models import Batch, Chapter, Subject, Enrollment
 from .serializers import BatchSerializer, ChapterSerializer, SubjectSerializer
@@ -32,7 +32,8 @@ class GetChapters(ListAPIView):
 
     def get_queryset(self):
         subject_id = self.kwargs['subject_id']
-        subject = Subject.objects.get(uid=subject_id)
+        subject = Subject.objects.filter(uid=subject_id).first()
+        subject = get_object_or_404(Subject, uid=subject_id)
         return Chapter.objects.filter_for_user(self.request.user, subject.batch.uid)
 
 
@@ -73,6 +74,6 @@ class ListChapterLectures(ListAPIView):
     serializer_class = LectureSerializer
 
     def get_queryset(self):
-        chapter = Chapter.objects.filter(uid=self.kwargs['uid']).first()
+        chapter = get_object_or_404(Chapter, uid=self.kwargs['uid'])
         chapter.check_permissions(self.request.user)
         return chapter.lectures.all()
