@@ -2,7 +2,7 @@ from .models import Lecture
 from core.permissions import OnlyTeacherUpdate, IsTeacher
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework import generics
-from .serializers import LectureSerializer
+from .serializers import LectureSerializer, CreateLectureSerializer
 from .tasks import transcode_video, upload_to_youtube
 import subprocess
 
@@ -19,12 +19,12 @@ def get_video_length(filename):
 class LectureCreateView(generics.CreateAPIView):
 
     queryset = Lecture.objects.all()
-    serializer_class = LectureSerializer
+    serializer_class = CreateLectureSerializer
     permission_classes = [IsTeacher]
 
     def perform_create(self, serializer):
         lecture = serializer.save(type=self.request.user.institute.upload_type)
-        lecture.duration = int(get_video_length(lecture.file.path))
+        # lecture.duration = int(get_video_length(lecture.file.path))
 
         if not self.request.user.institute == lecture.chapter.subject.batch.institute:
             lecture.delete()

@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.urls import path
 from django.shortcuts import redirect
 from django.utils.html import format_html
-from .models import GoogleCredentials
+from .models import GoogleCredentials, Lecture
 
 
 class GoogleCredentialsAdmin(admin.ModelAdmin):
@@ -31,3 +31,4 @@ class GoogleCredentialsAdmin(admin.ModelAdmin):
 
 
 admin.site.register(GoogleCredentials, GoogleCredentialsAdmin)
+admin.site.register(Lecture)

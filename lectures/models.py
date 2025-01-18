@@ -1,4 +1,4 @@
-from batches.models import Chapter, Batch, Enrollment
+from batches.models import Chapter
 from core.models import BaseModel
 from django.db import models
 

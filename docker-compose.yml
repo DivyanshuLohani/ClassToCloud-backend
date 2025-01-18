@@ -1,0 +1,94 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: ./.compose/local/django/Dockerfile
+    image: backend-server-classto-cloud
+    # '/start' is the shell script used to run the service
+    command: /start
+    # this volume is used to map the files and folders on the host to the container
+    # so if we change code on the host, code in the docker container will also be changed
+    volumes:
+      - .:/app
+    ports:
+      - 8000:8000
+    # env_file is used to manage the env variables of our project
+    env_file:
+      - ./.env/.env.local
+    depends_on:
+      - redis
+      - db
+
+  db:
+    image: postgres:latest
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=classtocloud
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+
+  redis:
+    image: redis:latest
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: ./.compose/local/django/Dockerfile
+    image: class-to-cloud-celeary-worker
+    command: /start-celeryworker
+    volumes:
+      - .:/app
+    env_file:
+      - ./.env/.env.local
+    depends_on:
+      - redis
+      - db
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: ./.compose/local/django/Dockerfile
+    image: class-to-cloud-celeary-beat
+    command: /start-celerybeat
+    volumes:
+      - .:/app
+    env_file:
+      - ./.env/.env.local
+    depends_on:
+      - redis
+      - db
+
+  # Celeary Dashboard
+  flower:
+    build:
+      context: .
+      dockerfile: ./.compose/local/django/Dockerfile
+    image: class-to-cloud-celeary-flower
+    command: /start-flower
+    volumes:
+      - .:/app
+    env_file:
+      - ./.env/.env.local
+    ports:
+      - 5555:5555
+    depends_on:
+      - redis
+      - db
+
+  # AWS Emulation
+  localstack:
+    image: localstack/localstack
+    container_name: localstack_main
+    ports:
+      - "4566:4566"  # LocalStack Gateway
+      - "4571:4571"  # S3
+    environment:
+      - SERVICES=s3,dynamodb
+      - DATA_DIR=/var/lib/localstack/data
+    volumes:
+      - ./localstack-data:/var/lib/localstack/data
+
+volumes:
+  postgres_data:
+  localstack_data:
