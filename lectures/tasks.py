@@ -1,6 +1,6 @@
-from tempfile import NamedTemporaryFile
+from tempfile import TemporaryDirectory
 from celery import shared_task
-import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import googleapiclient.discovery
 import googleapiclient.errors
@@ -9,130 +9,136 @@ from django.conf import settings
 from .models import Lecture, GoogleCredentials
 import json
 import boto3
+from ffmpeg import input as ffmpeg_input, output as ffmpeg_output, run as ffmpeg_run
 
-# Initialize S3 client
 s3 = boto3.client(
-    's3',
+    "s3",
     aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
     aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-    endpoint_url=settings.AWS_S3_ENDPOINT_URL  # LocalStack endpoint or AWS endpoint
+    endpoint_url=settings.AWS_S3_ENDPOINT_URL if settings.DEBUG else None,
 )
 bucket_name = settings.AWS_STORAGE_BUCKET_NAME
 
+# Video resolutions and settings
 resolutions = [
-    {
-        'resolution': '320x180',
-        'video_bitrate': '500k',
-        'audio_bitrate': '64k'
-    },
-    {
-        'resolution': '854x480',
-        'video_bitrate': '1000k',
-        'audio_bitrate': '128k'
-    },
-    {
-        'resolution': '1280x720',
-        'video_bitrate': '2500k',
-        'audio_bitrate': '192k'
-    }
+    {"resolution": "320x180", "video_bitrate": "500k", "audio_bitrate": "128k"},
+    {"resolution": "854x480", "video_bitrate": "1000k", "audio_bitrate": "128k"},
+    {"resolution": "1920x1080", "video_bitrate": "3000k", "audio_bitrate": "192k"},
 ]
 
 
 @shared_task
 def transcode_video(lecture_id):
     lecture = Lecture.objects.get(uid=lecture_id)
-    lecture.status = 'in_progress'
+    lecture.status = "in_progress"
     lecture.save()
 
     input_key = lecture.file.name  # S3 key of the uploaded file
+    input_url = f"{settings.AWS_S3_ENDPOINT_URL}/{bucket_name}/{input_key}"
 
-    # Download the file from S3
-    with NamedTemporaryFile(delete=False) as temp_file:
-        s3.download_fileobj(bucket_name, input_key, temp_file)
-        temp_file.flush()
-        input_path = temp_file.name  # Local path of the downloaded file
+    # Temporary directory for intermediate files
+    with TemporaryDirectory() as temp_dir:
+        output_dir = os.path.join(temp_dir, f"lectures/{lecture_id}")
+        os.makedirs(output_dir, exist_ok=True)
 
-    # Prepare output directory
-    output_dir = os.path.join("/tmp", f"lectures/{lecture_id}")
-    os.makedirs(output_dir, exist_ok=True)
-    variant_playlists = []
+        # Transcode and upload concurrently
+        variant_playlists = []
+        with ThreadPoolExecutor(max_workers=len(resolutions)) as executor:
+            future_to_resolution = {
+                executor.submit(
+                    transcode_and_upload, res, input_url, output_dir, lecture_id
+                ): res
+                for res in resolutions
+            }
 
-    # Video transcoding logic
-    resolutions = [
-        {'resolution': '320x180', 'video_bitrate': '500k', 'audio_bitrate': '128k'},
-        {'resolution': '854x480', 'video_bitrate': '1000k', 'audio_bitrate': '128k'},
-        {'resolution': '1920x1080', 'video_bitrate': '3000k', 'audio_bitrate': '192k'},
-    ]
+            for future in as_completed(future_to_resolution):
+                resolution = future_to_resolution[future]
+                try:
+                    output_filename = future.result()
+                    variant_playlists.append({
+                        "resolution": resolution["resolution"],
+                        "output_file_name": output_filename,
+                    })
+                except Exception as e:
+                    lecture.status = "failed"
+                    lecture.save()
+                    raise e
 
-    for _, res in enumerate(resolutions):
-        resolution = res['resolution']
-        video_bitrate = res['video_bitrate']
-        audio_bitrate = res['audio_bitrate']
-        output_filename = f"{resolution}.m3u8"
-        output_path = os.path.join(output_dir, output_filename)
-        segment_path = os.path.join(output_dir, f"{resolution}_%03d.ts")
+        # Create master playlist after all transcoding is done
+        master_playlist_file_path = os.path.join(output_dir, "master.m3u8")
+        create_master_playlist(master_playlist_file_path, variant_playlists)
 
-        command = [
-            'ffmpeg',
-            '-i', input_path,                       # Input File
-            '-c:v', 'h264',                         # Video Codec
-            '-b:v', video_bitrate,                  # Video Bitrate
-            '-c:a', 'aac',                          # Audio Codec
-            '-b:a', audio_bitrate,                  # Audio Bitrate
-            '-vf', f'scale={resolution}',           # Video Resolution
-            '-f', 'hls',                            # Video Format
-            '-hls_time', '10',                      # Video Chunk TIME
-            '-hls_list_size', '0',                  # HLS LIST SIZE
-            '-hls_segment_filename', segment_path,  # Segment File name
-            output_path                             # Output m3u8 File
-        ]
+        # Upload master playlist
+        with open(master_playlist_file_path, "rb") as f:
+            s3.upload_fileobj(
+                f, bucket_name, f"lectures/{lecture_id}/master.m3u8"
+            )
 
-        try:
-            subprocess.run(command, check=True)
-        except subprocess.CalledProcessError:
-            lecture.status = 'failed'
-            lecture.save()
-            os.remove(input_path)
-            return
+        # Update lecture file to point to the master playlist
+        lecture.file = f"lectures/{lecture_id}/master.m3u8"
+        lecture.status = "completed"
+        lecture.save()
 
-        variant_playlists.append({
-            'resolution': resolution,
-            'output_file_name': output_filename,
-        })
 
-    # Create master playlist
+def transcode_and_upload(resolution, input_url, output_dir, lecture_id):
+    resolution_value = resolution["resolution"]
+    video_bitrate = resolution["video_bitrate"]
+    audio_bitrate = resolution["audio_bitrate"]
+    output_filename = f"{resolution_value}.m3u8"
+    output_path = os.path.join(output_dir, output_filename)
+    segment_path = os.path.join(output_dir, f"{resolution_value}_%03d.ts")
+
+    # Transcoding with python-ffmpeg
+    ffmpeg_in = ffmpeg_input(input_url)
+    ffmpeg_out = ffmpeg_output(
+        ffmpeg_in,
+        output_path,
+        **{
+            "c:v": "h264",
+            "b:v": video_bitrate,
+            "c:a": "aac",
+            "b:a": audio_bitrate,
+            "vf": f"scale={resolution_value}",
+            "f": "hls",
+            "hls_time": 10,
+            "hls_list_size": 0,
+            "hls_segment_filename": segment_path,
+        },
+    )
+    ffmpeg_run(ffmpeg_out)
+
+    # Upload transcoded files
+    for root, _, files in os.walk(output_dir):
+        for file_name in files:
+            if file_name.startswith(resolution_value):
+                file_path = os.path.join(root, file_name)
+                s3_key = f"lectures/{lecture_id}/{file_name}"
+                with open(file_path, "rb") as f:
+                    s3.upload_fileobj(f, bucket_name, s3_key)
+
+    return output_filename
+
+
+def create_master_playlist(master_playlist_file_path, variant_playlists):
+    bandwidth_map = {
+        "320x180": 676800,
+        "854x480": 1353600,
+        "1920x1080": 3230400,
+    }
+
     master_playlist_content = "#EXTM3U\n"
     for variant in variant_playlists:
-        resolution = variant['resolution']
-        output_file_name = variant['output_file_name']
-        bandwidth = 676800 if resolution == '320x180' else 1353600 if resolution == '854x480' else 3230400
+        resolution = variant["resolution"]
+        output_file_name = variant["output_file_name"]
+        bandwidth = bandwidth_map[resolution]
+        master_playlist_content += (
+            f"#EXT-X-STREAM-INF:BANDWIDTH={
+                bandwidth},RESOLUTION={resolution}\n"
+            f"{output_file_name}\n"
+        )
 
-        master_playlist_content += f"#EXT-X-STREAM-INF:BANDWIDTH={
-            bandwidth},RESOLUTION={resolution}\n{output_file_name}\n"
-
-    master_playlist_file_path = os.path.join(output_dir, "master.m3u8")
-    with open(master_playlist_file_path, 'w') as f:
+    with open(master_playlist_file_path, "w") as f:
         f.write(master_playlist_content)
-
-    # Upload transcoded files back to S3
-    for root, _, files in os.walk(output_dir):
-        for file_name in files:
-            file_path = os.path.join(root, file_name)
-            s3_key = f"lectures/{lecture_id}/{file_name}"
-            with open(file_path, "rb") as f:
-                s3.upload_fileobj(f, bucket_name, s3_key)
-
-    # Update lecture with the master playlist path
-    lecture.file = f"lectures/{lecture_id}/master.m3u8"
-    lecture.status = "completed"
-    lecture.save()
-
-    # Clean up local files
-    os.remove(input_path)
-    for root, _, files in os.walk(output_dir):
-        for file_name in files:
-            os.remove(os.path.join(root, file_name))
-    os.rmdir(output_dir)
 
 
 @shared_task

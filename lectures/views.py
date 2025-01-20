@@ -2,42 +2,128 @@ from .models import Lecture
 from core.permissions import OnlyTeacherUpdate, IsTeacher
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework import generics
-from .serializers import LectureSerializer, CreateLectureSerializer
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .serializers import LectureSerializer, CreateLectureSerializer, UploadInitalizerSerializer, UploadChunkSerializer
 from .tasks import transcode_video, upload_to_youtube
-import subprocess
+from django.conf import settings
+import boto3
+import zlib
 
 
-def get_video_length(filename):
-    result = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
-                             "format=duration", "-of",
-                             "default=noprint_wrappers=1:nokey=1", filename],
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT)
-    return float(result.stdout)
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+    endpoint_url=settings.AWS_S3_ENDPOINT_URL if settings.DEBUG else None,
+)
 
 
-class LectureCreateView(generics.CreateAPIView):
-
-    queryset = Lecture.objects.all()
-    serializer_class = CreateLectureSerializer
+class LectureUploadInitializeView(APIView):
     permission_classes = [IsTeacher]
 
-    def perform_create(self, serializer):
-        lecture = serializer.save(type=self.request.user.institute.upload_type)
-        # lecture.duration = int(get_video_length(lecture.file.path))
+    def post(self, request, *args, **kwargs):
+        serializer = UploadInitalizerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        lecture = Lecture.objects.create(
+            chapter=serializer.validated_data['chapter'],
+            title=serializer.validated_data['title'],
+            type=self.request.user.institute.upload_type
+        )
 
         if not self.request.user.institute == lecture.chapter.subject.batch.institute:
             lecture.delete()
             raise NotFound("Chapter not found.")
 
-        if lecture.type == 'native' and lecture.file:
-            lecture.status = 'pending'
-            lecture.save()
+        response = s3_client.create_multipart_upload(
+            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+            Key=f"lectures/{lecture.uid}/",
+            ChecksumAlgorithm="CRC32"  # Match LocalStack's expected algorithm
+        )
+
+        return Response({"upload_id": response["UploadId"], "uid": lecture.uid}, status=200)
+
+
+class LectureUploadChunkView(APIView):
+    permission_classes = [IsTeacher]
+
+    def post(self, request, *args, **kwargs):
+        serializer = UploadChunkSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+
+        file_obj = serializer.validated_data['file']
+        # crc32_checksum = calculate_crc32(file_obj)
+        try:
+
+            response = s3_client.upload_part(
+                Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+                Key=f"lectures/{serializer.validated_data['uid']}/",
+                PartNumber=serializer.validated_data['part_number'],
+                UploadId=serializer.validated_data['upload_id'],
+                Body=file_obj,
+                ChecksumAlgorithm="CRC32"  # Match LocalStack's expected algorithm
+            )
+            return Response(
+                {
+                    "status": "success",
+                    "uid": serializer.validated_data['uid'],
+                    "ETag": response["ETag"]
+                }, status=200)
+
+        except Exception as e:
+            print(e)
+            return Response(
+                {
+                    "status": "error",
+                    "error": "Failed to upload part",
+                }, status=200)
+
+
+class LectureUploadCompleteView(APIView):
+    permission_classes = [IsTeacher]
+
+    def post(self, request, *args, **kwargs):
+        uid = request.data['uid']
+        upload_id = request.data['upload_id']
+        lecture = Lecture.objects.get(uid=uid)
+        if not lecture.chapter.subject.batch.institute == self.request.user.institute:
+            raise PermissionDenied(
+                "You do not have permission to access this lecture."
+            )
+        key = f"lectures/{lecture.uid}/"
+
+        response = s3_client.list_parts(
+            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+            Key=key,
+            UploadId=upload_id,
+        )
+
+        parts = [
+            {"PartNumber": part['PartNumber'], "ETag": part['ETag'],
+                "ChecksumCRC32": part['ChecksumCRC32']}
+            for part in response.get('Parts', [])
+        ]
+        if not parts:
+            raise NotFound("Parts not found or have currpted.")
+
+        response = s3_client.complete_multipart_upload(
+            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+            Key=key,
+            UploadId=upload_id,
+            MultipartUpload={'Parts': parts}
+        )
+
+        lecture.file = key
+        lecture.status = "pending"
+        lecture.save()
+        if lecture.type == "native":
             transcode_video.delay(lecture.uid)
-        elif lecture.type == 'youtube' and lecture.file:
-            lecture.status = 'pending'
-            lecture.save()
+        else:
             upload_to_youtube.delay(lecture.uid)
+        serializer = LectureSerializer(lecture)
+        return Response(serializer.data, status=200)
 
 
 class LectureView(generics.RetrieveUpdateDestroyAPIView):

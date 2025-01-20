@@ -1,6 +1,23 @@
 from rest_framework import serializers
+from batches.models import Chapter
 from documents.serializers import NoteSerializer, DPPSerializer
 from .models import Lecture
+
+
+class UploadInitalizerSerializer(serializers.Serializer):
+
+    title = serializers.CharField(max_length=255)
+    chapter = serializers.PrimaryKeyRelatedField(
+        queryset=Chapter.objects.all()
+    )
+
+
+class UploadChunkSerializer(serializers.Serializer):
+
+    file = serializers.FileField()
+    upload_id = serializers.CharField()
+    part_number = serializers.IntegerField()
+    uid = serializers.CharField()
 
 
 class CreateLectureSerializer(serializers.ModelSerializer):
