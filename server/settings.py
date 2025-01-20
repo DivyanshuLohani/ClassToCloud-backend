@@ -218,7 +218,7 @@ AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
 AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
 AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME')
 if DEBUG:
-    AWS_S3_ENDPOINT_URL = "http://localstack:4566"
+    AWS_S3_ENDPOINT_URL = "http://minio:9000"  # MinIO S3 endpoint
 AWS_S3_SIGNATURE_VERSION = 's3v4'
 
 DEFAULT_FILE_STORAGE = 'server.storage.LocalStackS3Storage'

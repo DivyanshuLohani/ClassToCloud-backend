@@ -18,6 +18,8 @@ s3_client = boto3.client(
     endpoint_url=settings.AWS_S3_ENDPOINT_URL if settings.DEBUG else None,
 )
 
+LECTURE_FILE_UPLOAD_KEY = "uploads/lectures/{0}"
+
 
 class LectureUploadInitializeView(APIView):
     permission_classes = [IsTeacher]
@@ -37,8 +39,7 @@ class LectureUploadInitializeView(APIView):
 
         response = s3_client.create_multipart_upload(
             Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-            Key=f"lectures/{lecture.uid}/",
-            ChecksumAlgorithm="CRC32"  # Match LocalStack's expected algorithm
+            Key=LECTURE_FILE_UPLOAD_KEY.format(lecture.uid),
         )
 
         return Response({"upload_id": response["UploadId"], "uid": lecture.uid}, status=200)
@@ -59,11 +60,11 @@ class LectureUploadChunkView(APIView):
 
             response = s3_client.upload_part(
                 Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-                Key=f"lectures/{serializer.validated_data['uid']}/",
+                Key=LECTURE_FILE_UPLOAD_KEY.format(
+                    serializer.validated_data['uid']),
                 PartNumber=serializer.validated_data['part_number'],
                 UploadId=serializer.validated_data['upload_id'],
                 Body=file_obj,
-                ChecksumAlgorithm="CRC32"  # Match LocalStack's expected algorithm
             )
             return Response(
                 {
@@ -78,7 +79,7 @@ class LectureUploadChunkView(APIView):
                 {
                     "status": "error",
                     "error": "Failed to upload part",
-                }, status=200)
+                }, status=500)
 
 
 class LectureUploadCompleteView(APIView):
@@ -86,13 +87,15 @@ class LectureUploadCompleteView(APIView):
 
     def post(self, request, *args, **kwargs):
         uid = request.data['uid']
+        if not uid:
+            raise NotFound("Lecture not found.")
         upload_id = request.data['upload_id']
         lecture = Lecture.objects.get(uid=uid)
         if not lecture.chapter.subject.batch.institute == self.request.user.institute:
             raise PermissionDenied(
                 "You do not have permission to access this lecture."
             )
-        key = f"lectures/{lecture.uid}/"
+        key = LECTURE_FILE_UPLOAD_KEY.format(uid)
 
         response = s3_client.list_parts(
             Bucket=settings.AWS_STORAGE_BUCKET_NAME,

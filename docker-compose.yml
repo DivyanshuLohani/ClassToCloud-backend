@@ -77,20 +77,19 @@ services:
       - db
 
   # AWS Emulation
-  localstack:
-    image: localstack/localstack
-    container_name: localstack_main
+  minio:
+    image: minio/minio
+    container_name: minio
     ports:
-      - "4566:4566"  # LocalStack Gateway
-      - "4571:4571"  # S3
+      - "9000:9000" 
+      - "9001:9001" 
     environment:
-      - LOCALSTACK_AUTH_TOKEN=ls-cOtO7417-YoVU-2006-fufU-ZaxaSIgof94b
-      - SERVICES=s3,dynamodb
-      - PERSISTENCE=1
-
+      - MINIO_ROOT_USER=ROOTNAME
+      - MINIO_ROOT_PASSWORD=CHANGEME123
+    command: server /data --console-address ":9001"
     volumes:
-      - ./localstack-data:/var/lib/localstack/data
+      - minio_data:/data
 
 volumes:
   postgres_data:
-  localstack_data:
+  minio_data:

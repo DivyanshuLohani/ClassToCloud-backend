@@ -2,6 +2,7 @@ from rest_framework import serializers
 from batches.models import Chapter
 from documents.serializers import NoteSerializer, DPPSerializer
 from .models import Lecture
+from core.mixins import SignedFileFieldMixin
 
 
 class UploadInitalizerSerializer(serializers.Serializer):
@@ -32,16 +33,15 @@ class CreateLectureSerializer(serializers.ModelSerializer):
         }
 
 
-class LectureSerializer(serializers.ModelSerializer):
+class LectureSerializer(serializers.ModelSerializer, SignedFileFieldMixin):
     notes = NoteSerializer(many=True, read_only=True)
     dpps = DPPSerializer(many=True, read_only=True)
-    file = serializers.SerializerMethodField()
 
-    def get_file(self, obj):
-        if obj.type == 'native':
-            return obj.file.url
-        else:
+    def get_file(self, instance):
+        url = super().get_file(instance)
+        if instance.status != "completed":
             return None
+        return url
 
     class Meta:
         model = Lecture

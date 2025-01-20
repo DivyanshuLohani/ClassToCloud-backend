@@ -1,4 +1,4 @@
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 from celery import shared_task
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
@@ -10,6 +10,7 @@ from .models import Lecture, GoogleCredentials
 import json
 import boto3
 from ffmpeg import input as ffmpeg_input, output as ffmpeg_output, run as ffmpeg_run
+from django.core.files.storage import default_storage
 
 s3 = boto3.client(
     "s3",
@@ -34,7 +35,10 @@ def transcode_video(lecture_id):
     lecture.save()
 
     input_key = lecture.file.name  # S3 key of the uploaded file
-    input_url = f"{settings.AWS_S3_ENDPOINT_URL}/{bucket_name}/{input_key}"
+    # input_url = f"{settings.AWS_S3_ENDPOINT_URL}/{bucket_name}/{input_key}"
+    input_url = s3.generate_presigned_url(
+        "get_object", Params={"Bucket": bucket_name, "Key": input_key}
+    )
 
     # Temporary directory for intermediate files
     with TemporaryDirectory() as temp_dir:
@@ -73,6 +77,9 @@ def transcode_video(lecture_id):
             s3.upload_fileobj(
                 f, bucket_name, f"lectures/{lecture_id}/master.m3u8"
             )
+
+        # Delete the object after complete transcoding
+        s3.delete_object(Bucket=bucket_name, Key=input_key)
 
         # Update lecture file to point to the master playlist
         lecture.file = f"lectures/{lecture_id}/master.m3u8"
@@ -143,12 +150,16 @@ def create_master_playlist(master_playlist_file_path, variant_playlists):
 
 @shared_task
 def upload_to_youtube(lecture_id):
-
     lecture = Lecture.objects.get(uid=lecture_id)
     lecture.status = "in_progress"
     lecture.save()
 
-    video_file = lecture.file.path
+    # Handle file from Django storages
+    video_file = lecture.file.name
+    with default_storage.open(video_file, "rb") as file:
+        temp_file = NamedTemporaryFile(delete=False)
+        temp_file.write(file.read())
+        temp_file.flush()
 
     # Disable https requirement for local testing
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
@@ -178,7 +189,7 @@ def upload_to_youtube(lecture_id):
     }
 
     media_file = googleapiclient.http.MediaFileUpload(
-        video_file, chunksize=-1, resumable=True)
+        temp_file.name, chunksize=-1, resumable=True)
 
     request = youtube.videos().insert(
         part="snippet,status",
@@ -191,6 +202,8 @@ def upload_to_youtube(lecture_id):
     # Save YouTube video ID to the Lecture model
     lecture.video_id = response["id"]
     lecture.status = "completed"
-    os.remove(lecture.file.path)
     lecture.file = None
     lecture.save()
+
+    # Clean up the temporary file
+    os.remove(temp_file.name)
