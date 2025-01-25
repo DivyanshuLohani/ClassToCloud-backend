@@ -35,6 +35,71 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = bool(os.environ.get("DEBUG"))
 
+LOGGING = {
+    'version': 1,
+    # Ensures existing loggers like Django's are not disabled
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': 'error.log',  # Logs errors to this file
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],  # Logs to console and file
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'core': {
+            'handlers': ['console', 'file'],  # For your "core" app
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'authentication': {
+            'handlers': ['console', 'file'],  # For your "authentication" app
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'batches': {
+            'handlers': ['console', 'file'],  # For your "batches" app
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'lectures': {
+            'handlers': ['console', 'file'],  # For your "lectures" app
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'documents': {
+            'handlers': ['console', 'file'],  # For your "documents" app
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],  # Default logger
+        'level': 'WARNING',
+    },
+}
+
 ALLOWED_HOSTS = ['*']
 CORS_ORIGIN_ALLOW_ALL = True
 
